@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JFIF to JPG Converter</title>
+    <style>
+        #dropArea {
+            border: 2px dashed #ccc;
+            border-radius: 5px;
+            width: 300px;
+            height: 200px;
+            line-height: 200px;
+            text-align: center;
+            color: #888;
+            margin: 20px;
+        }
+        #dropArea.hover {
+            border-color: #333;
+            background-color: #f0f0f0;
+        }
+        #outputContainer img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <button id="downloadAllButton">Download All JPGs</button>
+    <div id="dropArea">Drop JFIF files here</div>
+    <button id="convertButton">Convert to JPG</button>
+    <div id="outputContainer"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js?_v=20240720224521"></script>
+    <script>
+        const dropArea = document.getElementById('dropArea');
+        const outputContainer = document.getElementById('outputContainer');
+        const downloadAllButton = document.getElementById('downloadAllButton');
+
+        let filesToConvert = [];
+
+        // Обработчик перетаскивания файлов
+        dropArea.addEventListener('dragover', (event) => {
+            event.preventDefault();
+            dropArea.classList.add('hover');
+        });
+
+        dropArea.addEventListener('dragleave', () => {
+            dropArea.classList.remove('hover');
+        });
+
+        dropArea.addEventListener('drop', (event) => {
+            event.preventDefault();
+            dropArea.classList.remove('hover');
+            const files = event.dataTransfer.files;
+            handleFiles(files);
+        });
+
+        // Обработчик выбора файлов через кнопку
+        document.getElementById('convertButton').addEventListener('click', () => {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.jfif';
+            input.multiple = true;
+            input.style.display = 'none';
+            document.body.appendChild(input);
+            input.click();
+            input.addEventListener('change', () => {
+                handleFiles(input.files);
+                document.body.removeChild(input);
+            });
+        });
+
+        // Обработчик создания архива и скачивания
+        downloadAllButton.addEventListener('click', async () => {
+            if (filesToConvert.length === 0) {
+                alert('No files to download');
+                return;
+            }
+
+            const zip = new JSZip();
+            const promises = filesToConvert.map((file, index) => {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        const img = new Image();
+                        img.onload = () => {
+                            const canvas = document.createElement('canvas');
+                            canvas.width = img.width;
+                            canvas.height = img.height;
+                            const ctx = canvas.getContext('2d');
+                            ctx.drawImage(img, 0, 0);
+
+                            canvas.toBlob((blob) => {
+                                zip.file(file.name.replace(/\.jfif$/i, '.jpg'), blob);
+                                resolve();
+                            }, 'image/jpeg');
+                        };
+                        img.src = event.target.result;
+                    };
+                    reader.readAsDataURL(file);
+                });
+            });
+
+            await Promise.all(promises);
+
+            zip.generateAsync({ type: 'blob' }).then((content) => {
+                const url = URL.createObjectURL(content);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'images.zip';
+                a.click();
+                URL.revokeObjectURL(url);
+            });
+        });
+
+        // Функция обработки файлов
+        function handleFiles(files) {
+            filesToConvert = Array.from(files).filter(file => file.name.toLowerCase().endsWith('.jfif'));
+
+            if (filesToConvert.length === 0) {
+                alert('Only JFIF files are supported');
+                return;
+            }
+
+            outputContainer.innerHTML = ''; // Очищаем контейнер перед добавлением новых изображений
+
+            filesToConvert.forEach((file) => {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0);
+
+                        canvas.toBlob((blob) => {
+                            const newImg = document.createElement('img');
+                            const downloadLink = document.createElement('a');
+                            const url = URL.createObjectURL(blob);
+
+                            newImg.src = url;
+                            newImg.style.display = 'block';
+
+                            downloadLink.href = url;
+                            downloadLink.download = file.name.replace(/\.jfif$/i, '.jpg');
+                            downloadLink.textContent = `Download ${downloadLink.download}`;
+                            downloadLink.style.display = 'block';
+
+                            const outputDiv = document.createElement('div');
+                            outputDiv.appendChild(newImg);
+                            outputDiv.appendChild(downloadLink);
+
+                            outputContainer.appendChild(outputDiv);
+                        }, 'image/jpeg');
+                    };
+                    img.src = event.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+    </script>
+</body>
+</html>
