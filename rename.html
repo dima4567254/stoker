@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Image Renamer</title>
+  <style>
+    #dropAreaPng {
+      border: 2px dashed #ccc;
+      border-radius: 5px;
+      width: 300px;
+      height: 200px;
+      line-height: 200px;
+      text-align: center;
+      color: #888;
+      margin: 20px;
+    }
+
+    .hover {
+      border-color: #333;
+      background-color: #f0f0f0;
+    }
+
+    #outputContainer {
+      display: flex;
+      flex-wrap: wrap;
+      margin-top: 20px;
+    }
+
+    .thumbnail {
+      width: 150px;
+      margin: 10px;
+      position: relative;
+    }
+
+    .thumbnail img {
+      max-width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    .thumbnail a {
+      display: block;
+      text-align: center;
+      margin-top: 5px;
+    }
+
+    #downloadAllBtn {
+      margin-top: 20px;
+      padding: 10px 20px;
+      background-color: #007BFF;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>Image Renamer</h1>
+
+  <div id="dropAreaPng">Drop files here</div>
+  <input type="checkbox" id="renameFilesCheckbox"> Rename files to "adobe-stock YYYYMMDD"<br>
+  
+  <button id="downloadAllBtn" disabled>Download All Images</button>
+
+  <div id="outputContainer"></div>
+
+  <script>
+    const dropAreaPng = document.getElementById('dropAreaPng');
+    const renameFilesCheckbox = document.getElementById('renameFilesCheckbox');
+    const outputContainer = document.getElementById('outputContainer');
+    const downloadAllBtn = document.getElementById('downloadAllBtn');
+    let downloadLinks = [];
+
+    dropAreaPng.addEventListener('dragover', (event) => {
+      event.preventDefault();
+      dropAreaPng.classList.add('hover');
+    });
+
+    dropAreaPng.addEventListener('dragleave', () => {
+      dropAreaPng.classList.remove('hover');
+    });
+
+    dropAreaPng.addEventListener('drop', (event) => {
+      event.preventDefault();
+      dropAreaPng.classList.remove('hover');
+      const files = event.dataTransfer.files;
+      handleFiles(files);
+    });
+
+    function handleFiles(files) {
+      outputContainer.innerHTML = '';
+      downloadLinks = [];
+      Array.from(files).forEach((file, index) => {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const blob = new Blob([event.target.result], { type: file.type });
+          const url = URL.createObjectURL(blob);
+          let fileName = file.name;
+
+          if (renameFilesCheckbox.checked) {
+            const currentDate = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+            const fileExtension = fileName.split('.').pop();
+            fileName = `adobe-stock-${currentDate}-${index + 1}.${fileExtension}`;
+          }
+
+          const newImg = document.createElement('img');
+          const downloadLink = document.createElement('a');
+
+          newImg.src = url;
+          newImg.style.display = 'block';
+
+          downloadLink.href = url;
+          downloadLink.download = fileName;
+          downloadLink.textContent = `Download ${fileName}`;
+
+          downloadLinks.push({ url, fileName });
+
+          const thumbnailDiv = document.createElement('div');
+          thumbnailDiv.className = 'thumbnail';
+          thumbnailDiv.appendChild(newImg);
+          thumbnailDiv.appendChild(downloadLink);
+
+          outputContainer.appendChild(thumbnailDiv);
+        };
+        reader.readAsArrayBuffer(file);
+      });
+
+      downloadAllBtn.disabled = false;
+    }
+
+    downloadAllBtn.addEventListener('click', () => {
+      downloadLinks.forEach(link => {
+        const a = document.createElement('a');
+        a.href = link.url;
+        a.download = link.fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      });
+    });
+  </script>
+</body>
+
+</html>

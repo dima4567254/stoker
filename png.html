@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PNG to JPG Converter</title>
+    <style>
+        #dropAreaPng {
+            border: 2px dashed #ccc;
+            border-radius: 5px;
+            width: 300px;
+            height: 200px;
+            line-height: 200px;
+            text-align: center;
+            color: #888;
+            margin: 20px;
+        }
+        #dropAreaPng.hover {
+            border-color: #333;
+            background-color: #f0f0f0;
+        }
+        #outputContainer {
+            display: flex;
+            flex-wrap: wrap;
+            margin-top: 20px;
+        }
+        .thumbnail {
+            width: 150px;
+            margin: 10px;
+        }
+        .thumbnail img {
+            max-width: 100%;
+            height: auto;
+        }
+        #downloadAllButtonPng {
+            display: block;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>PNG to JPG Converter</h1>
+
+    <label>
+        <input type="checkbox" id="convertPngCheckbox" checked>
+        Convert PNG to JPG
+    </label>
+    <div id="dropAreaPng">Drop PNG files here</div>
+    <button id="downloadAllButtonPng">Download All Images</button>
+    <div id="outputContainer"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script>
+        let pngFilesToConvert = [];
+        const dropAreaPng = document.getElementById('dropAreaPng');
+        const outputContainer = document.getElementById('outputContainer');
+        const downloadAllButtonPng = document.getElementById('downloadAllButtonPng');
+        const convertPngCheckbox = document.getElementById('convertPngCheckbox');
+
+        dropAreaPng.addEventListener('dragover', (event) => {
+            event.preventDefault();
+            dropAreaPng.classList.add('hover');
+        });
+
+        dropAreaPng.addEventListener('dragleave', () => {
+            dropAreaPng.classList.remove('hover');
+        });
+
+        dropAreaPng.addEventListener('drop', (event) => {
+            event.preventDefault();
+            dropAreaPng.classList.remove('hover');
+            const files = event.dataTransfer.files;
+            handlePngFiles(files);
+        });
+
+        function handlePngFiles(files) {
+            pngFilesToConvert = [];
+
+            Array.from(files).forEach(file => {
+                const ext = file.name.toLowerCase().split('.').pop();
+                if (ext === 'png') {
+                    pngFilesToConvert.push(file);
+                }
+            });
+
+            if (pngFilesToConvert.length === 0) {
+                alert('No valid PNG files to convert.');
+                return;
+            }
+
+            outputContainer.innerHTML = '';
+
+            pngFilesToConvert.forEach((file) => {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+                        ctx.drawImage(img, 0, 0);
+
+                        canvas.toBlob((blob) => {
+                            let fileName = file.name;
+                            if (convertPngCheckbox.checked) {
+                                fileName = fileName.replace(/\.png$/i, '.jpg');
+                            }
+
+                            const newImg = document.createElement('img');
+                            const downloadLink = document.createElement('a');
+                            const url = URL.createObjectURL(blob);
+
+                            newImg.src = url;
+
+                            downloadLink.href = url;
+                            downloadLink.download = fileName;
+                            downloadLink.textContent = `Download ${fileName}`;
+
+                            const thumbnailDiv = document.createElement('div');
+                            thumbnailDiv.className = 'thumbnail';
+                            thumbnailDiv.appendChild(newImg);
+                            thumbnailDiv.appendChild(downloadLink);
+
+                            outputContainer.appendChild(thumbnailDiv);
+                        }, convertPngCheckbox.checked ? 'image/jpeg' : 'image/png');
+                    };
+                    img.src = event.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        downloadAllButtonPng.addEventListener('click', async () => {
+            if (pngFilesToConvert.length === 0) {
+                alert('No PNG files to download.');
+                return;
+            }
+
+            const zip = new JSZip();
+
+            await Promise.all(pngFilesToConvert.map((file) => {
+                return new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        const img = new Image();
+                        img.onload = () => {
+                            const canvas = document.createElement('canvas');
+                            const ctx = canvas.getContext('2d');
+                            canvas.width = img.width;
+                            canvas.height = img.height;
+                            ctx.drawImage(img, 0, 0);
+
+                            canvas.toBlob((blob) => {
+                                let fileName = file.name;
+                                if (convertPngCheckbox.checked) {
+                                    fileName = fileName.replace(/\.png$/i, '.jpg');
+                                }
+
+                                zip.file(fileName, blob);
+                                resolve();
+                            }, convertPngCheckbox.checked ? 'image/jpeg' : 'image/png');
+                        };
+                        img.src = event.target.result;
+                    };
+                    reader.readAsDataURL(file);
+                });
+            }));
+
+            const zipBlob = await zip.generateAsync({ type: 'blob' });
+            const zipUrl = URL.createObjectURL(zipBlob);
+            const downloadLink = document.createElement('a');
+            downloadLink.href = zipUrl;
+            downloadLink.download = 'images.zip';
+            downloadLink.click();
+        });
+    </script>
+</body>
+</html>

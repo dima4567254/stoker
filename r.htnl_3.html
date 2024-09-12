@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Processor</title>
+    <style>
+        #dropArea {
+            border: 2px dashed #ccc;
+            border-radius: 5px;
+            width: 300px;
+            height: 200px;
+            line-height: 200px;
+            text-align: center;
+            color: #888;
+            margin: 20px;
+            position: relative;
+        }
+        #dropArea.hover {
+            border-color: #333;
+            background-color: #f0f0f0;
+        }
+        #outputContainer {
+            display: flex;
+            flex-wrap: wrap;
+            margin-top: 20px;
+        }
+        .thumbnail {
+            width: 150px;
+            margin: 10px;
+        }
+        .thumbnail img {
+            max-width: 100%;
+            height: auto;
+        }
+        #fileCounter {
+            margin: 20px 0;
+            font-weight: bold;
+        }
+        #downloadAllButton {
+            display: block;
+            margin-top: 20px;
+        }
+        #resizeOptions, #convertOptions {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Image Processor</h1>
+    
+    <div id="resizeOptions">
+        <input type="checkbox" id="resize4096x3264" value="4096x3264">
+        <label for="resize4096x3264">Resize images to 4096x3264</label><br>
+        <input type="checkbox" id="resize4096x2304" value="4096x2304">
+        <label for="resize4096x2304">Resize images to 4096x2304</label><br>
+        <input type="checkbox" id="resize4096x4096" value="4096x4096">
+        <label for="resize4096x4096">Resize images to 4096x4096</label>
+    </div>
+
+    <div id="convertOptions">
+        <input type="checkbox" id="convertToJfifCheckbox">
+        <label for="convertToJfifCheckbox">Convert to JFIF</label><br>
+        <input type="checkbox" id="convertToPngCheckbox">
+        <label for="convertToPngCheckbox">Convert to PNG</label><br>
+        <input type="checkbox" id="convertToJpgCheckbox">
+        <label for="convertToJpgCheckbox">Convert to JPG</label>
+    </div>
+
+    <div id="dropArea">Drop images here</div>
+    <button id="downloadAllButton">Download All Images</button>
+    <div id="fileCounter">Files Uploaded: 0</div>
+    <div id="outputContainer"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script>
+        let filesToConvert = [];
+        const dropArea = document.getElementById('dropArea');
+        const outputContainer = document.getElementById('outputContainer');
+        const downloadAllButton = document.getElementById('downloadAllButton');
+        const fileCounter = document.getElementById('fileCounter');
+
+        const resizeCheckboxes = document.querySelectorAll('#resizeOptions input[type="checkbox"]');
+        const convertToJfifCheckbox = document.getElementById('convertToJfifCheckbox');
+        const convertToPngCheckbox = document.getElementById('convertToPngCheckbox');
+        const convertToJpgCheckbox = document.getElementById('convertToJpgCheckbox');
+
+        // Обработка перетаскивания
+        dropArea.addEventListener('dragover', (event) => {
+            event.preventDefault();
+            dropArea.classList.add('hover');
+        });
+
+        dropArea.addEventListener('dragleave', () => {
+            dropArea.classList.remove('hover');
+        });
+
+        dropArea.addEventListener('drop', (event) => {
+            event.preventDefault();
+            dropArea.classList.remove('hover');
+            const files = event.dataTransfer.files;
+            handleFiles(files);
+        });
+
+        // Обработка загруженных файлов
+        function handleFiles(files) {
+            filesToConvert = Array.from(files);
+            outputContainer.innerHTML = '';
+
+            if (filesToConvert.length === 0) {
+                alert('No files to process.');
+                return;
+            }
+
+            filesToConvert.forEach((file) => {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+
+                        let [width, height] = [img.width, img.height];
+                        let resizeOptionSelected = false;
+
+                        resizeCheckboxes.forEach(checkbox => {
+                            if (checkbox.checked) {
+                                [width, height] = checkbox.value.split('x').map(Number);
+                                resizeOptionSelected = true;
+                            }
+                        });
+
+                        canvas.width = width;
+                        canvas.height = height;
+                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+                        let fileExtension = 'jpg';
+                        let mimeType = 'image/jpeg';
+
+                        if (convertToPngCheckbox.checked) {
+                            fileExtension = 'png';
+                            mimeType = 'image/png';
+                        } else if (convertToJfifCheckbox.checked) {
+                            fileExtension = 'jfif';
+                            mimeType = 'image/jpeg';
+                        } else if (convertToJpgCheckbox.checked) {
+                            fileExtension = 'jpg';
+                            mimeType = 'image/jpeg';
+                        }
+
+                        if (!convertToJfifCheckbox.checked && !convertToPngCheckbox.checked && !convertToJpgCheckbox.checked) {
+                            alert('Please select at least one format to convert.');
+                            return;
+                        }
+
+                        canvas.toBlob((blob) => {
+                            const fileName = file.name.replace(/\.[^/.]+$/, `.${fileExtension}`);
+                            const newImg = document.createElement('img');
+                            const downloadLink = document.createElement('a');
+                            const url = URL.createObjectURL(blob);
+
+                            newImg.src = url;
+                            newImg.style.display = 'block';
+
+                            downloadLink.href = url;
+                            downloadLink.download = fileName;
+                            downloadLink.textContent = `Download ${fileName}`;
+
+                            const thumbnailDiv = document.createElement('div');
+                            thumbnailDiv.className = 'thumbnail';
+                            thumbnailDiv.appendChild(newImg);
+                            thumbnailDiv.appendChild(downloadLink);
+
+                            outputContainer.appendChild(thumbnailDiv);
+                        }, mimeType);
+                    };
+                    img.src = event.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+
+            updateFileCounter();
+        }
+
+        function updateFileCounter() {
+            fileCounter.textContent = `Files Uploaded: ${filesToConvert.length}`;
+        }
+
+        downloadAllButton.addEventListener('click', async () => {
+            if (filesToConvert.length === 0) {
+                alert('No files to download.');
+                return;
+            }
+
+            const zip = new JSZip();
+
+            await Promise.all(filesToConvert.map((file) => {
+                return new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        const img = new Image();
+                        img.onload = () => {
+                            const canvas = document.createElement('canvas');
+                            const ctx = canvas.getContext('2d');
+
+                            let [width, height] = [img.width, img.height];
+                            let resizeOptionSelected = false;
+
+                            resizeCheckboxes.forEach(checkbox => {
+                                if (checkbox.checked) {
+                                    [width, height] = checkbox.value.split('x').map(Number);
+                                    resizeOptionSelected = true;
+                                }
+                            });
+
+                            canvas.width = width;
+                            canvas.height = height;
+                            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+                            let fileExtension = 'jpg';
+                            let mimeType = 'image/jpeg';
+
+                            if (convertToPngCheckbox.checked) {
+                                fileExtension = 'png';
+                                mimeType = 'image/png';
+                            } else if (convertToJfifCheckbox.checked) {
+                                fileExtension = 'jfif';
+                                mimeType = 'image/jpeg';
+                            } else if (convertToJpgCheckbox.checked) {
+                                fileExtension = 'jpg';
+                                mimeType = 'image/jpeg';
+                            }
+
+                            if (!convertToJfifCheckbox.checked && !convertToPngCheckbox.checked && !convertToJpgCheckbox.checked) {
+                                resolve();
+                                return;
+                            }
+
+                            canvas.toBlob((blob) => {
+                                const fileName = file.name.replace(/\.[^/.]+$/, `.${fileExtension}`);
+                                zip.file(fileName, blob);
+                                resolve();
+                            }, mimeType);
+                        };
+                        img.src = event.target.result;
+                    };
+                    reader.readAsDataURL(file);
+                });
+            }));
+
+            const zipBlob = await zip.generateAsync({ type: 'blob' });
+            const zipUrl = URL.createObjectURL(zipBlob);
+            const downloadLink = document.createElement('a');
+            downloadLink.href = zipUrl;
+            downloadLink.download = 'images.zip';
+            downloadLink.click();
+        });
+
+        // Ensure only one checkbox is selected for conversion
+        document.querySelectorAll('#convertOptions input[type="checkbox"]').forEach(checkbox => {
+            checkbox.addEventListener('change', () => {
+                document.querySelectorAll('#convertOptions input[type="checkbox"]').forEach(cb => {
+                    if (cb !== checkbox) cb.checked = false;
+                });
+            });
+        });
+    </script>
+</body>
+</html>

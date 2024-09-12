@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Resizer</title>
+    <style>
+        #dropArea {
+            border: 2px dashed #ccc;
+            border-radius: 5px;
+            width: 300px;
+            height: 200px;
+            line-height: 200px;
+            text-align: center;
+            color: #888;
+            margin: 20px;
+            position: relative;
+        }
+        #dropArea.hover {
+            border-color: #333;
+            background-color: #f0f0f0;
+        }
+        #outputContainer {
+            display: flex;
+            flex-wrap: wrap;
+            margin-top: 20px;
+        }
+        .thumbnail {
+            width: 150px;
+            margin: 10px;
+            position: relative;
+        }
+        .thumbnail img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+        }
+        .thumbnail a {
+            display: block;
+            text-align: center;
+            margin-top: 5px;
+        }
+        #fileCounter {
+            margin: 20px 0;
+            font-weight: bold;
+        }
+        #downloadAllButton {
+            display: block;
+            margin-top: 20px;
+        }
+        #resizeOptions {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Image Resizer</h1>
+    <div id="resizeOptions">
+        <input type="radio" name="resizeOption" id="resize4096x3264" value="4096x3264" checked>
+        <label for="resize4096x3264">Resize images to 4096x3264</label><br>
+        <input type="radio" name="resizeOption" id="resize4096x2304" value="4096x2304">
+        <label for="resize4096x2304">Resize images to 4096x2304</label><br>
+        <input type="radio" name="resizeOption" id="resize4096x4096" value="4096x4096">
+        <label for="resize4096x4096">Resize images to 4096x4096</label>
+    </div>
+    <div id="dropArea">Drop images here</div>
+    <button id="downloadAllButton">Download All Images</button>
+    <div id="fileCounter">Files Uploaded: 0</div>
+    <div id="outputContainer"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script>
+        let imageFilesToConvert = [];
+        const dropArea = document.getElementById('dropArea');
+        const outputContainer = document.getElementById('outputContainer');
+        const downloadAllButton = document.getElementById('downloadAllButton');
+        const fileCounter = document.getElementById('fileCounter');
+
+        // Обработка перетаскивания
+        dropArea.addEventListener('dragover', (event) => {
+            event.preventDefault();
+            dropArea.classList.add('hover');
+        });
+
+        dropArea.addEventListener('dragleave', () => {
+            dropArea.classList.remove('hover');
+        });
+
+        dropArea.addEventListener('drop', (event) => {
+            event.preventDefault();
+            dropArea.classList.remove('hover');
+            const files = event.dataTransfer.files;
+            handleImageFiles(files);
+        });
+
+        // Обработка загруженных файлов
+        function handleImageFiles(files) {
+            imageFilesToConvert = [];
+
+            Array.from(files).forEach(file => {
+                const ext = file.name.toLowerCase().split('.').pop();
+                const acceptedFormats = ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'jfif'];
+                if (acceptedFormats.includes(ext)) {
+                    imageFilesToConvert.push(file);
+                } else {
+                    console.log(`File type not supported: ${file.name}`);
+                }
+            });
+
+            if (imageFilesToConvert.length === 0) {
+                alert('No valid image files to convert.');
+                return;
+            }
+
+            outputContainer.innerHTML = '';
+
+            imageFilesToConvert.forEach((file, index) => {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+                        const resizeOption = document.querySelector('input[name="resizeOption"]:checked').value;
+                        const [width, height] = resizeOption.split('x').map(Number);
+                        canvas.width = width;
+                        canvas.height = height;
+                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+                        canvas.toBlob((blob) => {
+                            const fileName = file.name.replace(/\.[^/.]+$/, '.jpg');
+
+                            const newImg = document.createElement('img');
+                            const downloadLink = document.createElement('a');
+                            const url = URL.createObjectURL(blob);
+
+                            newImg.src = url;
+                            newImg.style.display = 'block';
+
+                            downloadLink.href = url;
+                            downloadLink.download = fileName;
+                            downloadLink.textContent = `Download ${fileName}`;
+
+                            const thumbnailDiv = document.createElement('div');
+                            thumbnailDiv.className = 'thumbnail';
+                            thumbnailDiv.appendChild(newImg);
+                            thumbnailDiv.appendChild(downloadLink);
+
+                            outputContainer.appendChild(thumbnailDiv);
+                        }, 'image/jpeg');
+                    };
+                    img.src = event.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+
+            updateFileCounter();
+        }
+
+        function updateFileCounter() {
+            fileCounter.textContent = `Files Uploaded: ${imageFilesToConvert.length}`;
+        }
+
+        downloadAllButton.addEventListener('click', async () => {
+            if (imageFilesToConvert.length === 0) {
+                alert('No image files to download.');
+                return;
+            }
+
+            const zip = new JSZip();
+
+            await Promise.all(imageFilesToConvert.map((file) => {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        const img = new Image();
+                        img.onload = () => {
+                            const canvas = document.createElement('canvas');
+                            const ctx = canvas.getContext('2d');
+                            const resizeOption = document.querySelector('input[name="resizeOption"]:checked').value;
+                            const [width, height] = resizeOption.split('x').map(Number);
+                            canvas.width = width;
+                            canvas.height = height;
+                            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+                            canvas.toBlob((blob) => {
+                                const fileName = file.name.replace(/\.[^/.]+$/, '.jpg');
+                                zip.file(fileName, blob);
+                                resolve();
+                            }, 'image/jpeg');
+                        };
+                        img.src = event.target.result;
+                    };
+                    reader.readAsDataURL(file);
+                });
+            }));
+
+            const zipBlob = await zip.generateAsync({ type: 'blob' });
+            const zipUrl = URL.createObjectURL(zipBlob);
+            const downloadLink = document.createElement('a');
+            downloadLink.href = zipUrl;
+            downloadLink.download = 'images.zip';
+            downloadLink.click();
+        });
+    </script>
+</body>
+</html>

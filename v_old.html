@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Resizer and JFIF Converter</title>
+    <style>
+        #dropAreaPng, #dropAreaJfif {
+            border: 2px dashed #ccc;
+            border-radius: 5px;
+            width: 300px;
+            height: 200px;
+            line-height: 200px;
+            text-align: center;
+            color: #888;
+            margin: 20px;
+            float: left;
+        }
+        #dropAreaPng.hover, #dropAreaJfif.hover {
+            border-color: #333;
+            background-color: #f0f0f0;
+        }
+        #outputContainer, #jfifOutputContainer {
+            display: flex;
+            flex-wrap: wrap;
+            margin-top: 20px;
+        }
+        .thumbnail {
+            width: 150px;
+            margin: 10px;
+            position: relative;
+        }
+        .thumbnail img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+        }
+        .thumbnail a {
+            display: block;
+            text-align: center;
+            margin-top: 5px;
+        }
+        #indicator {
+            display: none;
+            margin-top: 10px;
+            font-weight: bold;
+            color: green;
+        }
+        #fileCounter {
+            margin: 20px 0;
+            font-weight: bold;
+        }
+        #downloadAllButtonPng, #downloadAllButtonJfif {
+            display: block;
+            margin-top: 20px;
+        }
+        #jfifSection {
+            clear: both;
+            margin-top: 40px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Image Resizer and JFIF Converter</h1>
+
+    <!-- PNG to JPG Resizer -->
+    <h2>PNG to JPG Resizer</h2>
+    <div id="dropAreaPng">Drop PNG files here</div>
+    <input type="checkbox" id="convertPngCheckbox"> Convert PNG to JPG<br>
+    <input type="checkbox" id="renameFilesCheckbox"> Rename files to "adobe-stock YYYYMMDD"<br>
+    <input type="checkbox" id="resolution4096"> 4096x4096<br>
+    <input type="checkbox" id="resolution3264"> 4096x3264<br>
+    <input type="checkbox" id="resolution2304"> 4096x2304<br>
+    <button id="downloadAllButtonPng">Download All Images</button>
+    <div id="fileCounter">Files Uploaded: 0</div>
+    <div id="outputContainer"></div>
+    <div id="indicator">Conversion Complete!</div>
+
+    <!-- JFIF to JPG Converter -->
+    <div id="jfifSection">
+        <h2>JFIF to JPG Converter</h2>
+        <div id="dropAreaJfif">Drop JFIF files here</div>
+        <input type="checkbox" id="renameJfifFilesCheckbox"> Rename files to "adobe-stock YYYYMMDD"<br>
+        <button id="downloadAllButtonJfif">Download All Images</button>
+        <div id="jfifOutputContainer"></div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script>
+        // Variables for PNG and JFIF processing
+        let pngFilesToConvert = [];
+        let jfifFilesToConvert = [];
+
+        // PNG to JPG Resizer
+        const dropAreaPng = document.getElementById('dropAreaPng');
+        const outputContainer = document.getElementById('outputContainer');
+        const downloadAllButtonPng = document.getElementById('downloadAllButtonPng');
+        const convertPngCheckbox = document.getElementById('convertPngCheckbox');
+        const renameFilesCheckbox = document.getElementById('renameFilesCheckbox');
+        const resolution3264 = document.getElementById('resolution3264');
+        const resolution4096 = document.getElementById('resolution4096');
+        const resolution2304 = document.getElementById('resolution2304');
+        const fileCounter = document.getElementById('fileCounter');
+        const indicator = document.getElementById('indicator');
+
+        dropAreaPng.addEventListener('dragover', (event) => {
+            event.preventDefault();
+            dropAreaPng.classList.add('hover');
+        });
+
+        dropAreaPng.addEventListener('dragleave', () => {
+            dropAreaPng.classList.remove('hover');
+        });
+
+        dropAreaPng.addEventListener('drop', (event) => {
+            event.preventDefault();
+            dropAreaPng.classList.remove('hover');
+            const files = event.dataTransfer.files;
+            handlePngFiles(files);
+        });
+
+        function handlePngFiles(files) {
+            pngFilesToConvert = [];
+
+            Array.from(files).forEach(file => {
+                const ext = file.name.toLowerCase().split('.').pop();
+                if (ext === 'png' && convertPngCheckbox.checked) {
+                    pngFilesToConvert.push(file);
+                }
+            });
+
+            if (pngFilesToConvert.length === 0) {
+                alert('No valid PNG files to convert.');
+                return;
+            }
+
+            outputContainer.innerHTML = '';
+            indicator.style.display = 'none';
+
+            pngFilesToConvert.forEach((file, index) => {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+                        if (resolution4096.checked) {
+                            canvas.width = 4096;
+                            canvas.height = 4096;
+                        } else if (resolution3264.checked) {
+                            canvas.width = 4096;
+                            canvas.height = 3264;
+                        } else if (resolution2304.checked) {
+                            canvas.width = 4096;
+                            canvas.height = 2304;
+                        } else {
+                            return;
+                        }
+                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+                        canvas.toBlob((blob) => {
+                            let fileName = file.name;
+                            if (convertPngCheckbox.checked && file.name.toLowerCase().endsWith('.png')) {
+                                fileName = fileName.replace(/\.png$/i, '.jpg');
+                            }
+                            if (renameFilesCheckbox.checked) {
+                                const currentDate = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+                                fileName = `adobe-stock-${currentDate}-${index + 1}.jpg`;
+                            }
+
+                            const newImg = document.createElement('img');
+                            const downloadLink = document.createElement('a');
+                            const url = URL.createObjectURL(blob);
+
+                            newImg.src = url;
+                            newImg.style.display = 'block';
+
+                            downloadLink.href = url;
+                            downloadLink.download = fileName;
+                            downloadLink.textContent = `Download ${fileName}`;
+
+                            const thumbnailDiv = document.createElement('div');
+                            thumbnailDiv.className = 'thumbnail';
+                            thumbnailDiv.appendChild(newImg);
+                            thumbnailDiv.appendChild(downloadLink);
+
+                            outputContainer.appendChild(thumbnailDiv);
+                        }, 'image/jpeg');
+                    };
+                    img.src = event.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+
+            updateFileCounter();
+        }
+
+        function updateFileCounter() {
+            fileCounter.textContent = `Files Uploaded: ${pngFilesToConvert.length}`;
+        }
+
+        downloadAllButtonPng.addEventListener('click', async () => {
+            if (pngFilesToConvert.length === 0) {
+                alert('No PNG files to download.');
+                return;
+            }
+
+            const selectedResolution = resolution4096.checked ? '4096x4096' : 
+                                      (resolution3264.checked ? '4096x3264' : 
+                                      (resolution2304.checked ? '4096x2304' : 'none'));
+            if (selectedResolution === 'none') {
+                alert('Select a resolution');
+                return;
+            }
+
+            const zip = new JSZip();
+            const currentDate = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+
+            await Promise.all(pngFilesToConvert.map((file, index) => {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        const img = new Image();
+                        img.onload = () => {
+                            const canvas = document.createElement('canvas');
+                            const ctx = canvas.getContext('2d');
+                            if (selectedResolution === '4096x4096') {
+                                canvas.width = 4096;
+                                canvas.height = 4096;
+                            } else if (selectedResolution === '4096x3264') {
+                                canvas.width = 4096;
+                                canvas.height = 3264;
+                            } else if (selectedResolution === '4096x2304') {
+                                canvas.width = 4096;
+                                canvas.height = 2304;
+                            } else {
+                                return;
+                            }
+                            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+                            canvas.toBlob((blob) => {
+                                let fileName = file.name;
+                                if (convertPngCheckbox.checked && file.name.toLowerCase().endsWith('.png')) {
+                                    fileName = fileName.replace(/\.png$/i, '.jpg');
+                                }
+                                if (renameFilesCheckbox.checked) {
+                                    fileName = `adobe-stock-${currentDate}-${index + 1}.jpg`;
+                                }
+                                zip.file(fileName, blob);
+                                resolve();
+                            }, 'image/jpeg');
+                        };
+                        img.src = event.target.result;
+                    };
+                    reader.readAsDataURL(file);
+                });
+            }));
+
+            const zipBlob = await zip.generateAsync({ type: 'blob' });
+            const zipUrl = URL.createObjectURL(zipBlob);
+            const downloadLink = document.createElement('a');
+            downloadLink.href = zipUrl;
+            downloadLink.download = 'images.zip';
+            downloadLink.click();
+
+            indicator.style.display = 'block';
+        });
+
+        // JFIF to JPG Converter
+        const dropAreaJfif = document.getElementById('dropAreaJfif');
+        const jfifOutputContainer = document.getElementById('jfifOutputContainer');
+        const downloadAllButtonJfif = document.getElementById('downloadAllButtonJfif');
+        const renameJfifFilesCheckbox = document.getElementById('renameJfifFilesCheckbox');
+
+        dropAreaJfif.addEventListener('dragover', (event) => {
+            event.preventDefault();
+            dropAreaJfif.classList.add('hover');
+        });
+
+        dropAreaJfif.addEventListener('dragleave', () => {
+            dropAreaJfif.classList.remove('hover');
+        });
+
+        dropAreaJfif.addEventListener('drop', (event) => {
+            event.preventDefault();
+            dropAreaJfif.classList.remove('hover');
+            const files = event.dataTransfer.files;
+            handleJfifFiles(files);
+        });
+
+        function handleJfifFiles(files) {
+            jfifFilesToConvert = [];
+
+            Array.from(files).forEach(file => {
+                const ext = file.name.toLowerCase().split('.').pop();
+                if (ext === 'jfif') {
+                    jfifFilesToConvert.push(file);
+                }
+            });
+
+            if (jfifFilesToConvert.length === 0) {
+                alert('No valid JFIF files to convert.');
+                return;
+            }
+
+            jfifOutputContainer.innerHTML = '';
+
+            jfifFilesToConvert.forEach((file, index) => {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+                        ctx.drawImage(img, 0, 0);
+
+                        canvas.toBlob((blob) => {
+                            let fileName = file.name.replace(/\.jfif$/i, '.jpg');
+                            if (renameJfifFilesCheckbox.checked) {
+                                const currentDate = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+                                fileName = `adobe-stock-${currentDate}-${index + 1}.jpg`;
+                            }
+
+                            const newImg = document.createElement('img');
+                            const downloadLink = document.createElement('a');
+                            const url = URL.createObjectURL(blob);
+
+                            newImg.src = url;
+                            newImg.style.display = 'block';
+
+                            downloadLink.href = url;
+                            downloadLink.download = fileName;
+                            downloadLink.textContent = `Download ${fileName}`;
+
+                            const thumbnailDiv = document.createElement('div');
+                            thumbnailDiv.className = 'thumbnail';
+                            thumbnailDiv.appendChild(newImg);
+                            thumbnailDiv.appendChild(downloadLink);
+
+                            jfifOutputContainer.appendChild(thumbnailDiv);
+                        }, 'image/jpeg');
+                    };
+                    img.src = event.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        downloadAllButtonJfif.addEventListener('click', async () => {
+            if (jfifFilesToConvert.length === 0) {
+                alert('No JFIF files to download.');
+                return;
+            }
+
+            const zip = new JSZip();
+            const currentDate = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+
+            await Promise.all(jfifFilesToConvert.map((file, index) => {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        const img = new Image();
+                        img.onload = () => {
+                            const canvas = document.createElement('canvas');
+                            const ctx = canvas.getContext('2d');
+                            canvas.width = img.width;
+                            canvas.height = img.height;
+                            ctx.drawImage(img, 0, 0);
+
+                            canvas.toBlob((blob) => {
+                                let fileName = file.name.replace(/\.jfif$/i, '.jpg');
+                                if (renameJfifFilesCheckbox.checked) {
+                                    fileName = `adobe-stock-${currentDate}-${index + 1}.jpg`;
+                                }
+                                zip.file(fileName, blob);
+                                resolve();
+                            }, 'image/jpeg');
+                        };
+                        img.src = event.target.result;
+                    };
+                    reader.readAsDataURL(file);
+                });
+            }));
+
+            const zipBlob = await zip.generateAsync({ type: 'blob' });
+            const zipUrl = URL.createObjectURL(zipBlob);
+            const downloadLink = document.createElement('a');
+            downloadLink.href = zipUrl;
+            downloadLink.download = 'jfif_images.zip';
+            downloadLink.click();
+        });
+    </script>
+</body>
+</html>

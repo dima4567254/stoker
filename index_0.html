@@ -70,6 +70,7 @@
     <input type="checkbox" id="renameFilesCheckbox"> Rename files to "adobe-stock YYYYMMDD"<br>
     <input type="checkbox" id="resolution4096"> 4096x4096<br>
     <input type="checkbox" id="resolution3264"> 4096x3264<br>
+    <input type="checkbox" id="resolution2304"> 4096x2304<br>
     <button id="downloadAllButtonPng">Download All Images</button>
     <div id="fileCounter">Files Uploaded: 0</div>
     <div id="outputContainer"></div>
@@ -98,6 +99,7 @@
         const renameFilesCheckbox = document.getElementById('renameFilesCheckbox');
         const resolution3264 = document.getElementById('resolution3264');
         const resolution4096 = document.getElementById('resolution4096');
+        const resolution2304 = document.getElementById('resolution2304');
         const fileCounter = document.getElementById('fileCounter');
         const indicator = document.getElementById('indicator');
 
@@ -148,6 +150,9 @@
                         } else if (resolution3264.checked) {
                             canvas.width = 4096;
                             canvas.height = 3264;
+                        } else if (resolution2304.checked) {
+                            canvas.width = 4096;
+                            canvas.height = 2304;
                         } else {
                             return;
                         }
@@ -200,7 +205,9 @@
                 return;
             }
 
-            const selectedResolution = resolution4096.checked ? '4096x4096' : (resolution3264.checked ? '4096x3264' : 'none');
+            const selectedResolution = resolution4096.checked ? '4096x4096' : 
+                                      (resolution3264.checked ? '4096x3264' : 
+                                      (resolution2304.checked ? '4096x2304' : 'none'));
             if (selectedResolution === 'none') {
                 alert('Select a resolution');
                 return;
@@ -223,6 +230,9 @@
                             } else if (selectedResolution === '4096x3264') {
                                 canvas.width = 4096;
                                 canvas.height = 3264;
+                            } else if (selectedResolution === '4096x2304') {
+                                canvas.width = 4096;
+                                canvas.height = 2304;
                             } else {
                                 return;
                             }
@@ -236,7 +246,6 @@
                                 if (renameFilesCheckbox.checked) {
                                     fileName = `adobe-stock-${currentDate}-${index + 1}.jpg`;
                                 }
-
                                 zip.file(fileName, blob);
                                 resolve();
                             }, 'image/jpeg');
@@ -247,13 +256,14 @@
                 });
             }));
 
-            zip.generateAsync({ type: 'blob' }).then((content) => {
-                const link = document.createElement('a');
-                link.href = URL.createObjectURL(content);
-                link.download = 'images.zip';
-                link.click();
-                indicator.style.display = 'block';
-            });
+            const zipBlob = await zip.generateAsync({ type: 'blob' });
+            const zipUrl = URL.createObjectURL(zipBlob);
+            const downloadLink = document.createElement('a');
+            downloadLink.href = zipUrl;
+            downloadLink.download = 'images.zip';
+            downloadLink.click();
+
+            indicator.style.display = 'block';
         });
 
         // JFIF to JPG Converter
@@ -289,7 +299,7 @@
             });
 
             if (jfifFilesToConvert.length === 0) {
-                alert('No JFIF files to convert.');
+                alert('No valid JFIF files to convert.');
                 return;
             }
 
@@ -364,7 +374,6 @@
                                 if (renameJfifFilesCheckbox.checked) {
                                     fileName = `adobe-stock-${currentDate}-${index + 1}.jpg`;
                                 }
-
                                 zip.file(fileName, blob);
                                 resolve();
                             }, 'image/jpeg');
@@ -375,12 +384,12 @@
                 });
             }));
 
-            zip.generateAsync({ type: 'blob' }).then((content) => {
-                const link = document.createElement('a');
-                link.href = URL.createObjectURL(content);
-                link.download = 'jfif-images.zip';
-                link.click();
-            });
+            const zipBlob = await zip.generateAsync({ type: 'blob' });
+            const zipUrl = URL.createObjectURL(zipBlob);
+            const downloadLink = document.createElement('a');
+            downloadLink.href = zipUrl;
+            downloadLink.download = 'jfif_images.zip';
+            downloadLink.click();
         });
     </script>
 </body>
